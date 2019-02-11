@@ -1,4 +1,4 @@
-# Homematic Skripte zum Steuern der Homematic über einen Kalender
+# Skripte zum Steuern der Homematic über einen Kalender
 Dieses Skriptsammlung nutzt einen Google Calendar zur Steuerung der Homematic.
 
 ## google-calendar.txt
