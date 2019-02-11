@@ -1,13 +1,7 @@
-# homematic-scripts
-scripts and tools for my homematic installation
+# Homematic Skripte für die Heizungssteuerung
 
-## homematic-backup.sh
-This script is regularly started on a NAS or another linux machine via crontab. The script executes a system backup on the Homematic ccu and saves the backup file on the executing computer. Finally, old backup files are deleted up to the specified number of backups.
+## raumheizung.txt
+Dieses Homematic Skript steuert die Heizung in einem bestimmten Raum, der in der Homematic angelegt sein muss. Die Steuerung funktioniert über bestimmte Presets und einer Reihe von Systemvariablen. 
 
-**Configuration within script**  
-    backupdir="/homematic/system-backup"   
-    name="homematic-ccu3"  
-    number of backups="30"  
-    host="1.1.1.1"  
-    user="user"  
-    password="password"  
+### benötigte Systemvariable und deren Bedeutung
+ 
