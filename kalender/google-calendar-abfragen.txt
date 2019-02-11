@@ -1,0 +1,313 @@
+! Google Script Abfrage
+!
+! Google Skript unter https://script.google.com
+! Parameter:	pwd = passwort
+!				cmd = urlaub		Ist in d Tagen Urlaub?
+! 				cmd = urlaub_ex		Rückgabe 
+!									0 - kein Urlaub heute / kein Urlaub morgen
+!									1 - Urlaub heute, abwesend / kein Urlaub morgen
+!									3 - Urlaub heute zu Hause / kein Urlaub morgen
+!									4 - kein Urlaub heute / Urlaub morgen, abwesend
+!									5 - Urlaub heute, abwesend / Urlaub morgen, abwesend
+!									7 - Urlaub heute zu Hause / Urlaub morgen, abwesend
+!									12 - kein Urlaub heute / Urlaub morgen zu Hause
+!									13 - Urlaub heute, abwesend / Urlaub morgen zu Hause
+!									15 - Urlaub heute zu Hause / Urlaub morgen zu Hause
+!				cmd = events		Liste der Termine in d Tagen
+!				cmd = eventstomorrow
+!
+!
+
+! --------------------------------------------------------------
+! Debuglevel lesen; Skriptname protokollieren
+! --------------------------------------------------------------
+integer debug = 0;
+debug = dom.GetObject('SysVar-Debuglevel').State();
+
+if (debug >= 1) { dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug SKRIPTSTART Google-Calendar");}
+
+
+string index;
+string heute = system.Date("%d.%m.");    ! heutiges Datum in der Form dd.mm.
+
+var aktMonat = system.Date("%m");  ! aktueller Monat
+aktMonat = aktMonat.ToInteger();
+
+integer aktMonatInt = aktMonat.ToInteger();
+
+var aktStunde = system.Date("%H");
+aktStunde = aktStunde.ToInteger();
+
+string Tagesliste;
+
+! --------------------------------------------------------------
+! Retten der Werte von Kaminzimmer und Fremdenzimmer von gestern
+! --------------------------------------------------------------
+
+if (aktStunde == 0)
+{
+	boolean GZ_gestern = dom.GetObject('SysVar-GZ-heute').State();
+	boolean GZ_gestern_nachm = dom.GetObject('SysVar-GZ-nachm').State();
+	GZ_gestern = GZ_gestern || GZ_gestern_nachm;
+	
+	boolean KZ_gestern = dom.GetObject('SysVar-KZ-heute').State();
+	boolean KZ_gestern_nachm = dom.GetObject('SysVar-KZ-nachm').State();
+	KZ_gestern = KZ_gestern || KZ_gestern_nachm;
+	
+	dom.GetObject('SysVar-GZ-gestern').State(GZ_gestern);
+	dom.GetObject('SysVar-KZ-gestern').State(KZ_gestern);
+}
+
+
+! --------------------------------------------------------------
+! Abfrage der events für heute aus dem Google Kalender
+! --------------------------------------------------------------
+
+dom.GetObject("CUxD.CUX2801001:1.CMD_SETS").State("LD_LIBRARY_PATH=/usr/local/addons/cuxd /usr/local/addons/cuxd/curl --trace-ascii /var/log/curl.trace -s -k -L 'https://script.google.com/macros/s/AKfycbxsVfjJdfXrR9aez13BihRf1S8b3cidDTOGtl9vNec6J_UVDWg/exec'");
+dom.GetObject("CUxD.CUX2801001:1.CMD_QUERY_RET").State(1);
+var v = dom.GetObject("CUxD.CUX2801001:1.CMD_RETS").State();
+
+if (debug >=3 ) { dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug 'Google Events heute ::" # v # "::'");}
+if (debug >=3 ) { dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug 'Google Events aktMonat ::" # aktMonat # "::'");}
+
+! ACHTUNG: Heizperiode wird gesteuert durch den Calendar-Eintrag "ZentralheizungAus"
+! daher per default auf an
+dom.GetObject('SysVar-Heizperiode').State(true);
+
+! umgestellt auf Monat 6 - 8 auf aus ohne Kalendereintrag
+if (aktMonatInt >=6 )
+{
+    if (debug >=3 ) { dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug 'Google Events aktMonat ist groesser 5'");}
+    if (aktMonatInt <= 8)
+    {
+       if (debug >=3 ) { dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug 'Google Events aktMonat ist groesser 5 und kleiner 9'");}
+       if (debug >=3 )
+       { 
+             dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug 'Google Events Zentralheizung ist im Sommer aus - aktueller Monat ::" # aktMonat # "::'");
+       }
+       dom.GetObject('SysVar-Heizperiode').State(false);
+   }
+}
+
+dom.GetObject('SysVar-Urlaubstag-heute').State(false);
+dom.GetObject('SysVar-Homeoffice-heute').State(false);
+dom.GetObject('SysVar-Reise-heute').State(false);
+dom.GetObject('SysVar-GZ-heute').State(false);
+dom.GetObject('SysVar-GZ-vorm').State(false);
+dom.GetObject('SysVar-GZ-nachm').State(false);
+dom.GetObject('SysVar-KZ-heute').State(false);
+dom.GetObject('SysVar-KZ-vorm').State(false);
+dom.GetObject('SysVar-KZ-nachm').State(false);
+dom.GetObject('SysVar-SA-heute').State(false);
+dom.GetObject('SysVar-BW-heute').State(false);
+dom.GetObject('SysVar-Nachmittag-heute').State(false);
+dom.GetObject('SysVar-Gaeste').State(false);
+
+foreach ( index, v.Split(";") )
+{
+	if (debug >= 4 ) { dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug 'Event heute::" # index # "::'");}
+	
+	if (index.Find("zentralheizungaus") > -1)	
+	{ 
+		dom.GetObject('SysVar-Heizperiode').State(false);
+		dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug Event heute " # index # " auf " # dom.GetObject('SysVar-Heizperiode').State() # " gesetzt");
+	}
+	if (index.Find("urlaub") > -1)
+	{ 
+		dom.GetObject('SysVar-Urlaubstag-heute').State(true);	
+		dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug Event heute " # index # " auf " # dom.GetObject('SysVar-Urlaubstag-heute').State() # " gesetzt");
+	}
+	if (index.Find("homeoffice") > -1)
+	{ 
+		dom.GetObject('SysVar-Homeoffice-heute').State(true);
+		dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug Event heute " # index # " auf " # dom.GetObject('SysVar-Homeoffice-heute').State() # " gesetzt");
+	}
+	if (index.Find("reise") > -1)
+	{ 
+		dom.GetObject('SysVar-Reise-heute').State(true);
+		dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug Event heute " # index # " auf " # dom.GetObject('SysVar-Reise-heute').State() # " gesetzt");
+	}
+	if (index.Find("kids") > -1)
+	{ 
+		dom.GetObject('SysVar-GZ-heute').State(true);
+		dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug Event heute " # index # " auf " # dom.GetObject('SysVar-GZ-heute').State() # " gesetzt");
+	}
+	if (index.Find("fremdenzimmer") > -1)
+	{ 
+		dom.GetObject('SysVar-GZ-heute').State(true);
+		dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug Event heute " # index # " auf " # dom.GetObject('SysVar-GZ-heute').State() # " gesetzt");
+	}
+	if (index.Find("gondelzimmer") > -1)
+	{ 
+		dom.GetObject('SysVar-GZ-heute').State(true);
+		dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug Event heute " # index # " auf " # dom.GetObject('SysVar-GZ-heute').State() # " gesetzt");
+	}
+	if (index.Find("kids-vorm") > -1)
+	{ 
+		dom.GetObject('SysVar-GZ-vorm').State(true);
+		dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug Event heute " # index # " auf " # dom.GetObject('SysVar-GZ-vorm').State() # " gesetzt");
+	}
+	if (index.Find("kids-nachm") > -1)
+	{ 
+		dom.GetObject('SysVar-GZ-nachm').State(true);
+		dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug Event heute " # index # " auf " # dom.GetObject('SysVar-GZ-nachm').State() # " gesetzt");
+	}
+	if (index.Find("kaminzimmer") > -1)
+	{ 
+		dom.GetObject('SysVar-KZ-heute').State(true);
+		dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug Event heute " # index # " auf " # dom.GetObject('SysVar-KZ-heute').State() # " gesetzt");
+	}
+	if (index.Find("kamin-vorm") > -1)
+	{ 
+		dom.GetObject('SysVar-KZ-vorm').State(true);
+		dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug Event heute " # index # " auf " # dom.GetObject('SysVar-KZ-vorm').State() # " gesetzt");
+	}
+	if (index.Find("kamin-nachm") > -1)
+	{ 
+		dom.GetObject('SysVar-KZ-nachm').State(true);
+		dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug Event heute " # index # " auf " # dom.GetObject('SysVar-KZ-nachm').State() # " gesetzt");
+	}
+	if (index.Find("nachmittag") > -1)
+	{ 
+		dom.GetObject('SysVar-Nachmittag-heute').State(true);
+		dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug Event heute " # index # " auf " # dom.GetObject('SysVar-Nachmittag-heute').State() # " gesetzt");
+	}
+	if (index.Find("saal") > -1)
+	{ 
+		dom.GetObject('SysVar-SA-heute').State(true);
+		dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug Event heute " # index # " auf " # dom.GetObject('SysVar-SA-heute').State() # " gesetzt");
+	}
+	if (index.Find("backeswohnung") > -1)
+	{ 
+		dom.GetObject('SysVar-BW-heute').State(true);
+		dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug Event heute " # index # " auf " # dom.GetObject('SysVar-BW-heute').State() # " gesetzt");
+	}
+	if (index.Find("gaeste") > -1)
+	{ 
+		dom.GetObject('SysVar-Gaeste').State(true);
+		dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug Event heute " # index # " auf " # dom.GetObject('SysVar-Gaeste').State() # " gesetzt");
+	}
+
+
+} ! foreach
+
+	
+! --------------------------------------------------------------
+! Abfrage der events für morgen aus dem Google Kalender
+! --------------------------------------------------------------
+
+dom.GetObject("CUxD.CUX2801001:2.CMD_SETS").State("LD_LIBRARY_PATH=/usr/local/addons/cuxd /usr/local/addons/cuxd/curl --trace-ascii /var/log/curl.trace -s -k -L 'https://script.google.com/macros/s/AKfycbwXWRIpc0L6oz-x8YY7PRmlw0J79sEcq93XRWaqzWhyfXLZnOU/exec'");
+dom.GetObject("CUxD.CUX2801001:2.CMD_QUERY_RET").State(1);
+var v = dom.GetObject("CUxD.CUX2801001:2.CMD_RETS").State();
+
+if (debug >=3 ) { dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug 'Google Events morgen ::" # v # "::'");}
+	
+dom.GetObject('SysVar-Urlaubstag-morgen').State(false);
+dom.GetObject('SysVar-Homeoffice-morgen').State(false);
+dom.GetObject('SysVar-Reise-morgen').State(false);
+dom.GetObject('SysVar-GZ-morgen').State(false);
+dom.GetObject('SysVar-KZ-morgen').State(false);
+dom.GetObject('SysVar-Nachmittag-morgen').State(false);
+
+foreach ( index, v.Split(";") )
+{
+	if (debug >= 4) { dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug Event morgen::" # index # "::");}
+	if (index.Find("urlaub") > -1)			{ dom.GetObject('SysVar-Urlaubstag-morgen').State(true);	}
+	if (index.Find("homeoffice") > -1)		{ dom.GetObject('SysVar-Homeoffice-morgen').State(true);	}
+	if (index.Find("reise") > -1)			{ dom.GetObject('SysVar-Reise-morgen').State(true);	}
+	if (index.Find("kids") > -1)			{ dom.GetObject('SysVar-GZ-morgen').State(true);	}
+	if (index.Find("fremdenzimmer") > -1)	{ dom.GetObject('SysVar-GZ-morgen').State(true);	}
+	if (index.Find("gondelzimmer") > -1)	{ dom.GetObject('SysVar-GZ-morgen').State(true);	}
+	if (index.Find("kaminzimmer") > -1)		{ dom.GetObject('SysVar-KZ-morgen').State(true);	}
+	if (index.Find("nachmittag") > -1)		{ dom.GetObject('SysVar-Nachmittag-morgen').State(true);	}
+} ! foreach
+
+
+! --------------------------------------------------------------
+! Setzen des Status "Tagsüber da"
+! --------------------------------------------------------------
+
+! Holen der Systemvariablen
+
+boolean Heizperiode = dom.GetObject('SysVar-Heizperiode').State();
+boolean Urlaubstag_heute = dom.GetObject('SysVar-Urlaubstag-heute').State();
+boolean Reise_heute = dom.GetObject('SysVar-Reise-heute').State();
+boolean Feiertag_heute = dom.GetObject('SysVar-Feiertag-heute').State();
+boolean Homeoffice_heute = dom.GetObject('SysVar-Homeoffice-heute').State();
+boolean Tagsueber_da_heute = true;
+boolean Urlaubstag_morgen = dom.GetObject('SysVar-Urlaubstag-morgen').State();
+boolean Reise_morgen = dom.GetObject('SysVar-Reise-morgen').State();
+boolean Feiertag_morgen = dom.GetObject('SysVar-Feiertag-morgen').State();
+boolean Homeoffice_morgen = dom.GetObject('SysVar-Homeoffice-morgen').State();
+boolean Tagsueber_da_morgen = true;
+
+if (debug >= 2 ) {
+	dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug SKRIPTSTATUS Systemvariable aktueller Stand ");
+	dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug SysVar-Heizperiode " # dom.GetObject('SysVar-Heizperiode').State() # "\n");
+	dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug SysVar-Urlaubstag-heute " # dom.GetObject('SysVar-Urlaubstag-heute').State() # "\n");
+	dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug SysVar-Reise-heute " # dom.GetObject('SysVar-Reise-heute').State() # "\n");
+	dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug SysVar-Feiertag-heute " # dom.GetObject('SysVar-Feiertag-heute').State() # "\n");
+	dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug SysVar-Homeoffice-heute " # dom.GetObject('SysVar-Homeoffice-heute').State() # "\n");
+	dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug SysVar-Urlaubstag-morgen " # dom.GetObject('SysVar-Urlaubstag-morgen').State() # "\n");
+	dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug SysVar-Reise-morgen " # dom.GetObject('SysVar-Reise-morgen').State() # "\n");
+	dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug SysVar-Feiertag-morgen " # dom.GetObject('SysVar-Feiertag-morgen').State() # "\n");
+	dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug SysVar-Homeoffice-morgen " # dom.GetObject('SysVar-Homeoffice-morgen').State() # "\n");
+	dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug SysVar-Gondelzimmer-heute " # dom.GetObject('SysVar-GZ-heute').State() # "\n");
+	dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug SysVar-Gondelzimmer-vorm " # dom.GetObject('SysVar-GZ-vorm').State() # "\n");
+	dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug SysVar-Gondelzimmer-nachm " # dom.GetObject('SysVar-GZ-nachm').State() # "\n");
+	dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug SysVar-Kaminzimmer-heute " # dom.GetObject('SysVar-KZ-heute').State() # "\n");
+	dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug SysVar-Kaminzimmer-vorm " # dom.GetObject('SysVar-KZ-vorm').State() # "\n");
+	dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug SysVar-Kaminzimmer-nachm " # dom.GetObject('SysVar-KZ-nachm').State() # "\n");
+dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug SysVar-Saal-heute " # dom.GetObject('SysVar-SA-heute').State() # "\n");
+dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug SysVar-Backeswohnung-heute " # dom.GetObject('SysVar-BW-heute').State() # "\n");
+dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug SysVar-Gaeste " # dom.GetObject('SysVar-BW-heute').State() # "\n");
+}
+
+! Wochentag von heute ermitteln
+! Montag = 1; Sonntag = 7
+integer Wochentag_heute = system.Date("%u").ToInteger();
+
+
+! Tagsuebeer_da wird auf false gesetzt, 
+! - wenn ein Reisetag ist oder
+! - wenn Mo - Fr ist und 
+!		- kein Urlaubstag ist
+!		- kein Homeofficetag ist
+!		- kein Feiertag ist
+  
+! Pruefen ob heute ein Reisetag ist  
+if (Reise_heute) {
+	Tagsueber_da_heute = false;
+} else {
+	! prüfen, ob heute Mo - Fr ist
+	if (Wochentag_heute < 6) { 
+		! Prüfen, ob Urlaub, Homeoffice oder Feiertag
+		if ( ( Urlaubstag_heute ) || ( Homeoffice_heute ) || ( Feiertag_heute ) )
+		{
+			Tagsueber_da_heute = true; 	
+		} else {
+			Tagsueber_da_heute = false; 
+		}
+	} else { 
+		Tagsueber_da_heute = true; 
+	}
+}
+
+dom.GetObject('SysVar-Tagsueber-da-heute').State(Tagsueber_da_heute);
+
+if (Reise_heute)
+{
+	dom.GetObject('SysVar-Anwesenheit').State(false);
+}
+else
+{
+	dom.GetObject('SysVar-Anwesenheit').State(true);
+}
+
+if (debug >= 2 ) 
+{
+	dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug 'SysVar-Tagsueber-da: " # dom.GetObject('SysVar-Tagsueber-da-heute').State() # "'");
+	dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug 'SysVar-Anwesenheit:  " # dom.GetObject('SysVar-Anwesenheit').State() # "'");
+}
+
+

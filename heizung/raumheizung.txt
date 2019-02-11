@@ -1,0 +1,666 @@
+string raum = "R-Wohnzimmer" ; 
+
+! ----------------------------------------------------------------------
+! Raumheizung
+! homematic-forum.de Script von Erik Groennerud - 8.2009- MM.2010
+! Ergaenzung von Zauberlehrling
+! Version 1.0
+! Optimiert und ergaenzt von Petrus (Peter)
+! ergänzt von BPoHVoodoo
+! ----------------------------------------------------------------------
+
+! --------------------------------------------------------------
+! Debuglevel lesen; Skriptname protokollieren
+! --------------------------------------------------------------
+integer debug = 0;
+debug = dom.GetObject('SysVar-Debuglevel').State();
+
+if (debug >= 1) { dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug 'SKRIPTSTART Raumheizung für Raum: " # raum # "'");}
+
+
+! ----------------------------------------------------------------------
+! Temperaturen 8-30 Grad, 0 = OFF, 100=ON
+! ----------------------------------------------------------------------
+real grad_0 = 18.5;
+real grad_1 = 19.5;
+real grad_2 = 20.5;
+real grad_3 = 22.0;
+real grad_4 = 22.5;
+real grad_5 = 23.0;
+real grad_6 = 25.0;
+real grad_7 = 27.0;
+real grad_8 = 0.0;
+real grad_9 = 100.0;
+
+real grad_fenster = 8.0;		! Temperatur bei offenem Fenster -1 = off
+real grad_auf_Reisen  = 17.0;	! Temperatur im Urlaub -1 = off
+real grad_gaeste  = 22.0;		! Temperatur fuer Gaeste -1 = off
+real grad_abwesend = 17;		! Temperatur ausser haus, wird als Absenkung benutzt, -1 = OFF (Anwesenheit)
+
+! ----------------------------------------------------------------------
+! Temperatursteuerung pro Tag
+! ----------------------------------------------------------------------
+integer wochenschema = 0;		! wochenschema == 0:	nimm pro Tage die jeweilige Zeile Mo = "mon"-Zeile, ...
+								! wochenschema == 1:	nimm für Mo - Fr die "mon"-Zeile und nimm für Sa und So die "sam"-Zeile
+								! wochenschema == 2:	nimm für alle Tage die "mon"-Zeile
+								! wochenschema == 3:	nimm für Mo - Fr die "mon"-Zeile und nimm für Sa die "sam"-Zeile und für So die "son"-Zeile
+
+integer leiste = 1;				! Welche Zeitleiste aktiv ist
+
+! Falls heute jemand tagsüber da ist, dann Leiste 2 setzen
+if (dom.GetObject('SysVar-Tagsueber-da-heute').State()) { leiste = 2; }
+
+! Falls heute Nachmittag jemand  da ist, dann Leiste 3 setzen
+if (dom.GetObject('SysVar-Nachmittag-heute').State()) { leiste = 3; }
+
+if (leiste == 1){
+! Zeitleiste 1
+! wochentags - Personen kommen am Abend heim
+!
+! Uhrzeit                0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 2 2 2 2|
+!                        0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3|
+string zeitleiste_mon = "000000000011111111111111111112223333333333321100";
+string zeitleiste_die = "000000000011111111111111111112223333333333321100";
+string zeitleiste_mit = "000000000011111111111111111112223333333333321100";
+string zeitleiste_don = "000000000011111111111111111112223333333333321100";
+string zeitleiste_fre = "000000000011111111111122333333333333333333332100";
+string zeitleiste_sam = "000000000022223333333333333333333333333333332100";
+string zeitleiste_son = "000000000022223333333333333333333333333333321100";
+};
+
+if (leiste == 2){
+! Zeitleiste 2
+! wochentags - Personen sind den ganzen Tag da
+!
+! Uhrzeit                0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 2 2 2 2|
+!                        0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3|
+string zeitleiste_mon = "000000000223333333333333333333333333333333332100";
+string zeitleiste_die = "000000000223333333333333333333333333333333332100";
+string zeitleiste_mit = "000000000223333333333333333333333333333333332100";
+string zeitleiste_don = "000000000223333333333333333333333333333333332100";
+string zeitleiste_fre = "000000000223333333333333333333333333333333332100";
+string zeitleiste_sam = "000000000222233333333333333333333333333333332100";
+string zeitleiste_son = "000000000222233333333333333333333333333333321100";
+};
+
+if (leiste == 3){
+! Zeitleiste 3
+! wochentags - Personen kommen am frühen Nachmittag heim
+!
+! Uhrzeit                0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 2 2 2 2|
+!                        0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3|
+string zeitleiste_mon = "000000000011111111111112223333333333333333331100";
+string zeitleiste_die = "000000000011111111111112223333333333333333331100";
+string zeitleiste_mit = "000000000011111111111112223333333333333333331100";
+string zeitleiste_don = "000000000011111111111112223333333333333333331100";
+string zeitleiste_fre = "000000000011111111111122333333333333333333332100";
+string zeitleiste_sam = "000000000022223333333333333333333333333333332100";
+string zeitleiste_son = "000000000022223333333333333333333333333333321100";
+};
+
+! ----------------------------------------------------------------------
+! weitere Variable
+! ----------------------------------------------------------------------
+string deltaStdMin = "10:00";	! deltaStdMin mit "hh:mm" setzten (Std / Min immer zweistellig) Differenzzeit, die manuelle Temperatur erhalten bleibt bis überschrieben wird.
+integer partytemperatur;
+integer diff;
+
+boolean reise_relevant = true;	! Ist die Einstellung Reise relevant? Falls wir (Eltern) unterwegs sind, dann aber z.B. dennoch Kinderzimmer heizen
+
+
+! ----------------------------------------------------------------------
+! manuelle Eingriffe
+! ----------------------------------------------------------------------
+integer TS_lastmanu = dom.GetObject('SysVar-TS-lastmanu-WZ').Value();
+
+! lesen der Zeitleiste, die beim vorherigen Lauf aktiv war
+integer TS_lastleiste = dom.GetObject('SysVar-WZ-Leiste').Value();
+
+!******************************************************
+! Ab hier Script CODE - Do not change behind this line
+!
+! ACHTUNG: Am Skript-Ende richitge Systemvariable einsetzen
+!
+!******************************************************
+
+! Umwandeln deltaStdMin in Sekunden
+integer stunde = deltaStdMin.Substr(0, 2).ToInteger();
+integer minute = deltaStdMin.Substr(3, 2).ToInteger();
+integer minSekToChange = (stunde * 3600) + (minute * 60);
+
+if (debug >= 4) { dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug 'minSekToChange: " # minSekToChange # "'");}
+
+
+
+object regler;					! Datenobjekt des Reglers für die Solltemperatur (Kanal 2)
+
+real soll_neu;					! Die neue Solltemperatur fuer den Raumthermostaten (Regler).
+real soll_alt;					! Die alte Solltemperatur der Zeitleiste, die zuletzt aktuell war.
+real soll_aktuell;				! Die aktuelle Solltemperatur im Raumthermostat (Regler).
+
+time timestampOfSysVar;			! Zeitstempel der Systemvariablen, die zuletzt geändert worden ist (Wert in Sekunden).
+time lasttimestampOfSysVar;			! Zeitstempel der Systemvariablen, die zuletzt geändert worden ist (Wert in Sekunden).
+boolean prioritaet = false;		! Ist prioritaet = true, dann wird die neue Solltemperatur auf jeden Fall in den Regler geschrieben.
+
+integer offen = 0;				! Anzahl geöffneter Schließkontakte im Raum
+
+! -----------------------------------------------------------------------------
+! Aktuelle Zeit merken
+! -----------------------------------------------------------------------------
+time now = system.Date("%Y-%m-%d %H:%M:%S").ToTime();
+
+if (debug >= 4) 
+{
+	dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug 'aktuelle Zeit: " # now # ", als Integer " # now.ToInteger() # "'");
+}
+ 
+! -----------------------------------------------------------------------------
+! Geräte im Raum durchsuchen
+! Wandthermostate, Heizkoerperthermostate: Devices merken; (letztes) soll_aktuell setzen
+! Schließerkontakte: zählen der geöffneten
+! -----------------------------------------------------------------------------
+ 
+var myRaum;
+
+var device;
+var item;
+var devAddresses = ";";
+
+var devWandThermostat;
+var reglerWandThermostat;
+real WT_soll_aktuell = -1;
+
+var devHeizkoerperT1;
+var devHeizkoerperT2;
+var devHeizkoerperT3;
+var devHeizkoerperT4;
+var reglerHeizkoerperT1;
+var reglerHeizkoerperT2;
+var reglerHeizkoerperT3;
+var reglerHeizkoerperT4;
+real HT_soll_aktuell = -1;
+integer nrHT = 0;
+
+string itemID;
+ 
+myRaum = dom.GetObject(raum);
+
+foreach(itemID, myRaum.EnumUsedIDs()) 
+{
+	item = dom.GetObject(itemID);
+	
+	! Nur Kanäle betrachten
+	if (item.IsTypeOf(OT_CHANNEL)) {
+		device = dom.GetObject(item.Device());
+
+
+		! Wenn Raumthermostat gefunden wurde
+		if ((device.HssType() == "HM-CC-TC") || (device.HssType() == "HM-TC-IT-WM-W-EU"))
+		{
+			!  Gibt es den Datenpunkt "SET_TEMPERATURE" bzw. "SETPOINT"?
+			if ( item.DPByHssDP("SET_TEMPERATURE") || item.DPByHssDP("SETPOINT") )
+			{
+				! Geräteobjekt identifizieren
+				if (device.HssType() == "HM-CC-TC") {
+					regler = dom.GetObject("BidCos-RF." # device.Address() # ":2.SETPOINT");
+				} else {
+					regler = dom.GetObject("BidCos-RF." # device.Address() # ":2.SET_TEMPERATURE");
+				}
+				
+				! aktuellen Wert auslesen
+				WT_soll_aktuell = regler.Value();
+				
+				!... und device merken
+				devWandThermostat = device;
+				reglerWandThermostat = regler;
+				
+				if (debug >= 3) {
+					dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug 'WT gemerkt itemID: " # itemID # ", Adresse: " # device.Address() # ", HssType: " # device.HssType() # "'");
+				}
+			}
+
+		}
+		else 
+		{	
+			! oder falls Heizungsthermostat gefunden wurde...
+			if ((device.HssType() == "HM-CC-RT-DN"))
+			{
+			
+				!  Gibt es den Datenpunkt "SET_TEMPERATURE"?
+				if ( item.DPByHssDP("SET_TEMPERATURE"))
+				{
+					! Geräteobjekt identifizieren
+					regler = dom.GetObject("BidCos-RF." # device.Address() # ":4.SET_TEMPERATURE");
+					
+					! Wert auslesen
+					HT_soll_aktuell = regler.Value(); ! die Soll-Temperatur des zuletzt gefundenen Heizkoerperthermostats bleibt schlussendlich in der Variable
+					
+					!... und devices merken; max. 4 Heizkoerperthermostate pro Raum
+					nrHT = nrHT +1;
+					if (nrHT == 1) {devHeizkoerperT1 = device; reglerHeizkoerperT1 = regler; };
+					if (nrHT == 2) {devHeizkoerperT2 = device; reglerHeizkoerperT2 = regler; };
+					if (nrHT == 3) {devHeizkoerperT3 = device; reglerHeizkoerperT3 = regler; };
+					if (nrHT == 4) {devHeizkoerperT4 = device; reglerHeizkoerperT4 = regler; };
+					
+					if (debug >= 3) {
+						dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug 'HT " # nrHT # " gemerkt itemID: " # itemID # ", Adresse: " # device.Address() # ", HssType: " # device.HssType() # "'");
+					}
+				}
+			}
+			else 
+			{
+				! Pruefen, ob Verschluss offen
+				! Testen, ob Fenster Dachluken, usw. offen sind. Diese müssen dem jeweiligen Raum und dem Gewerk "Verschluss" zugeordnet sein
+				! Alle Gewerke dem Raum zugeordneten Geräte untersuchen
+				! Andere als die aufgeführten Sensoren oder Aktoren, die als Verschluss dienen, einfach in nachfolgender IF-Anweisung ändern oder ergänzen.
+
+				! 		Türfensterkontakte                 Jalousienaktor / Dachluken Funk         Jalousienaktor / Dachluken Wired      Schließerkontakt-Sensor Hutschienenmontage        Fenster-Drehgriffsensoren
+				if ((device.HssType() == "HM-Sec-SC") || (device.HssType() == "HM-LC-Bl1-FM") || (device.HssType() == "HMW-LC-Bl1-DR")  || (device.HssType() == "HMW-Sen-SC-12-DR") || (device.HssType() == "HM-Sec-RHS")) {
+					var myChannel = dom.GetObject(item);
+					string id;
+					foreach(id, myChannel.ChnFunction()) {
+						var func = dom.GetObject(id);
+						if (func.Name() == "Verschluss") {
+							if (item.State() > 0) { offen = offen + 1.00; }
+						}
+					}
+				}
+			}
+		}
+	} ! if Kanal
+} ! foreach
+
+
+! --------------------------------------------------------------------------------------
+! Prüfen, ob ein Thermostat gefunden wurde
+! --------------------------------------------------------------------------------------
+
+soll_aktuell = -1;
+
+! Wandthermostat geht vor Heizkoerperthermostaten
+
+! Gibt es ein Wandthermostat?
+if ( WT_soll_aktuell >= 0 )
+{
+	! Ein Wandthermostat wurde gefunden und hat geantwortet.
+	soll_aktuell = WT_soll_aktuell; 
+}
+else 
+{
+	! Im Raum gibt es kein Wandthermostat! Gibt es Heizkoerperthermostate?
+	if ( HT_soll_aktuell >= 0 )
+	{
+		! Mindestens ein Heizkoerperthermostat wurde gefunden und hat geantwortet
+		soll_aktuell = HT_soll_aktuell; 
+	}
+}
+
+
+
+! --------------------------------------------------------------------------------------
+! neue Soll-Temperatur in Abhängigkeit von Systemvariablen und Scriptvariablen setzen
+!
+! und gleichzeitig ermitteln, wann zuletzt eine relevate SystemVariable gesetzt wurde
+! Die neue Soll-Temperatur wird nur dann gesetzt, wenn das letzte Setzen einer 
+! SystemVariablen länger her ist, als die vorgegebene Wartezeit delteStdMin
+! --------------------------------------------------------------------------------------
+
+! Falls  Zentralheizung aus, dann alle Ventile maximal auf
+if (!dom.GetObject('SysVar-Heizperiode').State()) 
+{
+    soll_neu = 100;
+    prioritaet = true;
+}
+
+else 
+{
+	! Falls irgendein Schließer offen ist, dann Soll-Temperatur auf grad_fenster setzen
+	if (offen > 0) 
+	{
+		if (soll_aktuell <= grad_fenster) { 
+			! Wenn soll_aktuell niedriger als grad_fenster (z.B. Ventile zu -> soll_aktuell = 0), dann nichts machen
+			soll_neu = soll_aktuell;
+		} else {
+			soll_neu = grad_fenster;
+			prioritaet = true;
+		}
+	}
+	else 
+	{
+		! --------------------------------------------------------------------------------------
+		! Systemvariable prüfen
+		! --------------------------------------------------------------------------------------
+
+		! --------------------------------------------------------------------------------------
+		! wurde Partytemperatur gesetzt?
+		! --------------------------------------------------------------------------------------
+
+		! Timestamp "Partytemperatur" festhalten
+		timestampOfSysVar = dom.GetObject('SysVar-Partytemperatur').Timestamp();
+		lasttimestampOfSysVar = dom.GetObject('SysVar-Partytemperatur').LastTimestamp();
+
+		if (debug >= 4) 
+		{
+			dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug 'Timestamp SysVar-Partytemperatur zuletzt gesetzt am: " # timestampOfSysVar # "; lasttimestamp: " # lasttimestampOfSysVar # "'");
+		}
+
+		! Partytemperatur testen und einstellen, -1 = deaktiviert
+		partytemperatur = dom.GetObject('SysVar-Partytemperatur').State();
+		if (partytemperatur > -1)
+		{ 
+			! SysVar-Partytemperatur wurde auf einen Temperaturwert gesetzt, diesen einstellen
+			soll_neu = partytemperatur;
+		} 
+		
+		
+		else 
+		{
+			! --------------------------------------------------------------------------------------
+			! Ist heute ein Reisetag?
+			! --------------------------------------------------------------------------------------
+
+			! Timestamp "Reise-heute" ist nicht relevant, da per Kalender 4x pro Tag gesetzt
+
+			! Reise-heute testen und einstellen, -1 = deaktiviert
+			if ((dom.GetObject('SysVar-Reise-heute').State()) && (grad_auf_Reisen > -1) && (reise_relevant))
+			{ 
+				! Falls heute auf Reisen und Variable grad_auf_Reisen nicht -1 (deaktiviert) und die Reiseeinstellung für diesen Raum relevant ist
+				soll_neu = grad_auf_Reisen;
+			}
+			
+			
+			else 
+			{
+				! --------------------------------------------------------------------------------------
+				! Sind heute Gäste da?
+				! --------------------------------------------------------------------------------------
+
+				! Prüfen ob Timestamp "Gaeste" jünger ist als bisherige Timestamps => Wenn ja, merken
+				settime = dom.GetObject('SysVar-Gaeste').Timestamp();
+				if (settime > timestampOfSysVar) {timestampOfSysVar = settime;}
+
+				if (debug >= 4) 
+				{
+					dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug 'Timestamp SysVar-Gaeste zuletzt gesetzt am: " # settime # "; jüngste timestampOfSysVar: " # timestampOfSysVar # "'");
+				}
+
+				! Gaeste testen und einstellen, -1 = deaktiviert
+				if ((dom.GetObject('SysVar-Gaeste').State()) && (grad_gaeste > -1))
+				{ 
+					! Falls Gaeste im Haus sind und grad_gaeste nicht -1 (deaktiviert)
+					soll_neu = grad_gaeste;
+				} 
+				
+				
+				
+				else 
+				{
+					! --------------------------------------------------------------------------------------
+					! Wurde Systemvariable Anwesenheit manuell umgesetzt?
+					! --------------------------------------------------------------------------------------
+
+					! Prüfen ob Timestamp "Anwesenheit" jünger ist als bisherige Systemvariable => Wenn ja, merken
+					settime = dom.GetObject('SysVar-Anwesenheit').Timestamp();
+					if (settime > timestampOfSysVar) {timestampOfSysVar = settime;}
+
+					if (debug >= 4) 
+					{
+						dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug 'Timestamp SysVar-Anwesenheit zuletzt gesetzt am: " # settime # "; jüngste timestampOfSysVar: " # timestampOfSysVar # "'");
+					}
+
+					! Anwesenheit testen und einstellen, -1 = deaktiviert
+					if (( ! dom.GetObject('SysVar-Anwesenheit').State()) && (grad_abwesend > -1))
+					{
+						! Falls Anwesenheit auf FALSE gesetzt wurde und grad abwesend nicht deaktiviert
+						soll_neu = grad_abwesend;
+					}
+
+					
+					
+					else 
+					{
+						! --------------------------------------------------------------------------------------
+						! ansonsten ist also ein "normaler" Tag
+						! --------------------------------------------------------------------------------------
+
+						string zeitleiste_heute;        ! Die Temperaturleiste fuer den aktuellen Tag.
+						string zeitleiste_gestern;      ! Die Temperaturleiste von gestern.
+						string heizwert;                ! Enthaelt den Wert, der in der Zeitleiste zum jetzigen Zeitpunkt gilt.
+
+						! --------------------------------------------------------------------------------------
+						! auswerten, welche zeitleiste für heute gültig ist
+						! --------------------------------------------------------------------------------------
+
+						integer tag = system.Date("%u");
+						if ((tag == 1) && (wochenschema == 0)) {zeitleiste_heute = zeitleiste_mon;} else {
+						if ((tag == 2) && (wochenschema == 0)) {zeitleiste_heute = zeitleiste_die;} else {
+						if ((tag == 3) && (wochenschema == 0)) {zeitleiste_heute = zeitleiste_mit;} else {
+						if ((tag == 4) && (wochenschema == 0)) {zeitleiste_heute = zeitleiste_don;} else {
+						if ((tag == 5) && (wochenschema == 0)) {zeitleiste_heute = zeitleiste_fre;} else {
+						if ((tag == 6) && ((wochenschema == 0) || (wochenschema == 3))) {zeitleiste_heute = zeitleiste_sam;} else {
+						if ((tag == 7) && ((wochenschema == 0) || (wochenschema == 3))) {zeitleiste_heute = zeitleiste_son;} else {
+						if ((tag >= 1) && (tag <= 5) && ((wochenschema == 1) || (wochenschema == 3))) {zeitleiste_heute = zeitleiste_mon;} else {
+						if ((tag >= 6) && (tag <= 7) && (wochenschema == 1)) {zeitleiste_heute = zeitleiste_sam;} else {
+						if (wochenschema == 2) {zeitleiste_heute = zeitleiste_mon;} }}}}}}}}}
+
+						! An Feiertagen gilt die Temperatur von Samstag bzw. Sonntag
+						if (dom.GetObject('SysVar-Feiertag-heute').State() && ((wochenschema == 0) || (wochenschema == 3))) {zeitleiste_heute = zeitleiste_son;} else {
+						if (dom.GetObject('SysVar-Feiertag-heute').State() && (wochenschema == 1)) {zeitleiste_heute = zeitleiste_sam;}}
+
+						! --------------------------------------------------------------------------------------
+						! auswerten, welche Ziffer zur aktuellen Zeit gehört 
+						! --------------------------------------------------------------------------------------
+
+						! Position der Zeitleiste bestimmen
+						! als 2. Hälfte der Stunde(%M = Minute), dann rechte Zahl nehmen
+						if (system.Date("%M").ToInteger() > 29) {integer add = 1;} else {integer add = 0;}
+						integer sTime = (system.Date("%H").ToInteger()*2)+add;
+						heizwert = zeitleiste_heute.Substr(sTime, 1);
+
+						! Temperatur bestimmen, die gesetzt werden soll
+						if (heizwert == "0") {soll_neu = grad_0;} else {
+						if (heizwert == "1") {soll_neu = grad_1;} else {
+						if (heizwert == "2") {soll_neu = grad_2;} else {
+						if (heizwert == "3") {soll_neu = grad_3;} else {
+						if (heizwert == "4") {soll_neu = grad_4;} else {
+						if (heizwert == "5") {soll_neu = grad_5;} else {
+						if (heizwert == "6") {soll_neu = grad_6;} else {
+						if (heizwert == "7") {soll_neu = grad_7;} else {
+						if (heizwert == "8") {soll_neu = grad_8;} else {
+						if (heizwert == "9") {soll_neu = grad_9;} }}}}}}}}}
+
+						! letzte Solltemeratur bestimmen, dabei muß der wert von 00:00 beachtet werden - der letzte Wert war gestern
+						if (sTime == 0) 
+						{
+							if ((tag == 1) && ((wochenschema == 0) || (wochenschema == 3))) {zeitleiste_gestern = zeitleiste_son;} else {
+							if ((tag == 2) && (wochenschema == 0)) {zeitleiste_gestern = zeitleiste_mon;} else {
+							if ((tag == 3) && (wochenschema == 0)) {zeitleiste_gestern = zeitleiste_die;} else {
+							if ((tag == 4) && (wochenschema == 0)) {zeitleiste_gestern = zeitleiste_mit;} else {
+							if ((tag == 5) && (wochenschema == 0)) {zeitleiste_gestern = zeitleiste_don;} else {
+							if ((tag == 6) && (wochenschema == 0)) {zeitleiste_gestern = zeitleiste_fre;} else {
+							if ((tag == 7) && ((wochenschema == 0) || (wochenschema == 3))) {zeitleiste_gestern = zeitleiste_sam;} else {
+							if ((tag >= 2) && (tag <= 6) && ((wochenschema == 1) || (wochenschema == 3))) {zeitleiste_gestern  = zeitleiste_mon;} else {
+							if (((tag == 1) || (tag == 7)) && (wochenschema == 1)) {zeitleiste_gestern = zeitleiste_sam;} else {
+							if (wochenschema == 2) {zeitleiste_gestern = zeitleiste_mon;} }}}}}}}}}
+
+							heizwert = zeitleiste_gestern.Substr(47, 1);
+						} else {
+							heizwert = zeitleiste_heute.Substr((sTime-1), 1);
+						}
+
+						! Temperatur bestimmen, die in der letzten 30 Minuten gesetzt war
+						if (heizwert == "0") {soll_alt = grad_0;} else {
+						if (heizwert == "1") {soll_alt = grad_1;} else {
+						if (heizwert == "2") {soll_alt = grad_2;} else {
+						if (heizwert == "3") {soll_alt = grad_3;} else {
+						if (heizwert == "4") {soll_alt = grad_4;} else {
+						if (heizwert == "5") {soll_alt = grad_5;} else {
+						if (heizwert == "6") {soll_alt = grad_6;} else {
+						if (heizwert == "7") {soll_alt = grad_7;} else {
+						if (heizwert == "8") {soll_alt = grad_8;} else {
+						if (heizwert == "9") {soll_alt = grad_9;} }}}}}}}}}
+					} 
+				} 
+			} 
+		} 
+	}
+}
+
+
+if (debug >= 3) {
+	dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug 'Soll vorheriger Zyklus: " # soll_alt # ", Soll aktuell eingestellt: " # soll_aktuell # ", zu setzendes Soll: " # soll_neu # "'");
+}
+
+
+
+! --------------------------------------------------------------------------------------
+! Setzen der Temperatur 
+! --------------------------------------------------------------------------------------
+
+if (soll_aktuell >= 0) 
+{ 
+	if (debug >= 4) {
+		dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug 'Soll_aktuell ist groesser 0'");
+	}
+
+	! --------------------------------------------------------------------------------------------------
+	! Wandthermostat bzw. Heizkoerperthermostate wurden gefunden und Sollwert konnte ausgelesen werden
+	! --------------------------------------------------------------------------------------------------
+	
+    ! prüfen ob neue Solltemperatur in RT geschrieben werden muss.
+    ! Wenn aktuelle Solltemperatur = neue Solltemp., dann nichts machen
+	if (soll_aktuell <> soll_neu)
+	{ 
+		
+		! --------------------------------------------------------------------------------------------------
+		! Wurde am Thermostat manuell eine Temperatur gesetzt? aber nur, wenn Zeitleiste nicht gewechselt wurde
+		! --------------------------------------------------------------------------------------------------
+		
+		if ( (soll_aktuell <> soll_alt) && (TS_lastleiste == leiste) )
+		{
+			if (debug >= 4) {
+				dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug 'Thermostat wurde manuell gesetzt'");
+			}
+			
+			! wurde Systemvariable lastmanu im letzten Durchgang schon gesetzt?
+			if (TS_lastmanu == 0)
+			{
+				! noch nicht gesetzt - dann jetzt setzen
+				settime = now;
+				TS_lastmanu = settime.ToInteger();
+			}
+			else
+			{
+				settime = TS_lastmanu;
+			}
+						
+			diff = now.ToInteger() - settime.ToInteger(); 
+		}
+		else
+		{
+			if (debug >= 4) {
+				dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug 'Thermostat wurde NICHT manuell gesetzt'");
+			}
+			
+			diff = minSekToChange + 1;
+			TS_lastmanu = 0;
+		}
+
+		if (debug >= 4) 
+		{
+			dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug 'Zeitdifferenz jetzt zu letztes Setzen Thermostat: " # diff # "; Mindestunterschied: " # minSekToChange # "'");
+		}
+		
+		! --------------------------------------------------------------------------------------------------
+		! Temperatur setzen nur dann, wenn
+		! - Mindestwartezeit seit manueller Änderung bereits verstrichen ist oder
+		! - Priorität gesetzt wurde (keine Heizperiode, Sxhließer offen, ...)
+		! - di aktuelle Temperatur auf der Offene-Fenster-Temperatur steht
+		! - eine der SystemVariablen später gesetzt wurde als die Thermostat-Timestamps
+		! - aktuelle Soll-Temp gleich der vorhergehenden Soll-Temp und die neue Soll-Temp anders als die alte ist
+		! --------------------------------------------------------------------------------------------------
+
+		if (debug >= 4) 
+		{
+			dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug 'Bedingungen'");
+			dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug '                      Zeitunterschied größer Minimum? " # (diff >= minSekToChange) # "'");
+			dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug '                                  Prioritaet gesetzt? " # (prioritaet) # "'");
+			dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug '                 Soll-Temp gleich Fenster-offen-Temp? " # (soll_aktuell == grad_fenster) # "'");
+			dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug '        SysVar später gesetzt als Thermostat manuell? " # ((TS_lastmanu > 0) && (timestampOfSysVar >= TS_lastmanu.ToTime())) # "; timestampOfSysVar: " # timestampOfSysVar # "TS_lastmanu: " # TS_lastmanu.ToTime() # "'");
+			dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug 'aktuelles gleich altes Soll und neues ungleich altes? " # ((soll_aktuell == soll_alt) && (soll_alt <> soll_neu)) # "'");
+		}
+
+
+
+		if (	(diff >= minSekToChange) || 
+				(prioritaet) || 
+				(soll_aktuell == grad_fenster) || 
+				((TS_lastmanu > 0) && (timestampOfSysVar >= TS_lastmanu.ToTime())) || 
+				((soll_aktuell == soll_alt) && (soll_alt <> soll_neu))
+			) 
+		{
+			! --------------------------------------------------------------------------------------------------
+			! Temperatur setzen ...
+			! --------------------------------------------------------------------------------------------------
+
+			if ( WT_soll_aktuell >= 0 )
+			{
+				! --------------------------------------------------------------------------------------------------
+				! ... am Wandthermostat
+				! --------------------------------------------------------------------------------------------------
+				
+				reglerWandThermostat.State(soll_neu);
+
+				if (debug >= 2) { dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug 'Am WT neue Temp " # soll_neu # " gesetzt!'");}
+			}
+
+			else
+			{
+				! --------------------------------------------------------------------------------------------------
+				! ... an allen Heizkoerperthermostaten
+				! --------------------------------------------------------------------------------------------------
+				
+				integer laufvar = 1;
+				while ( laufvar <= nrHT )
+				{
+					if (laufvar == 1) {reglerHeizkoerperT1.State(soll_neu); };
+					if (laufvar == 2) {reglerHeizkoerperT2.State(soll_neu); };
+					if (laufvar == 3) {reglerHeizkoerperT3.State(soll_neu); };
+					if (laufvar == 4) {reglerHeizkoerperT4.State(soll_neu); };
+					
+					if (debug >= 2) { dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug 'Am HT neue Temp " # soll_neu # " gesetzt!'");}
+					
+					laufvar = laufvar + 1;
+				}
+			}
+			
+			! Systemvariable Manuelles-Setzen zurücksetzen
+			TS_lastmanu = 0;
+		} 
+		else
+		{
+			if (debug >= 3) { dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug 'Temperatur nicht neu gesetzt - Zeitdiff:" # diff # " (min. " # minSekToChange # "), Prio: " # prioritaet # ", Timestap SysVar: " # timestampOfSysVar # ", Timestap Manuell: " # TS_lastmanu.ToTime() # "'");}
+		}
+    }
+	else
+	{
+		if (debug >= 3) { dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug 'Temperatur nicht neu gesetzt - altes Soll = neues Soll'");}
+		
+		! Systemvariable Manuelles-Setzen zurücksetzen
+		TS_lastmanu = 0;
+	}
+} 
+else 
+{
+	if (debug >= 1) {
+		dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug 'Thermostate in " # raum # " antworten nicht!'");
+	}
+}
+
+! ----------------------------------------------------------------------
+! manuelle Eingriffe - Timestamp retten
+! ----------------------------------------------------------------------
+dom.GetObject('SysVar-TS-lastmanu-WZ').State(TS_lastmanu);
+dom.GetObject('SysVar-WZ-Leiste').State(TS_lastleiste);
+
+
