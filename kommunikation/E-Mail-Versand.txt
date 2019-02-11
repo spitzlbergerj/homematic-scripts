@@ -1,0 +1,35 @@
+! HomeMatic-Script
+! VERSANDSCRIPT FüR DAS CUXD-HTML-FRAMEWORK
+! http://www.christian-luetgens.de/homematic/cuxd/htmlframework/HTML-Framework.htm
+
+! SYSTEMVARIABLE
+  object o_versand = dom.GetObject ("E-Mail.Versand");
+  object o_body = dom.GetObject ("E-Mail.Body");
+
+if (o_versand.Value() > 0) {
+
+  ! P- ODER PRE-VORLAGE
+    integer i_template = o_versand.Value();
+    string s_newline = "\n";
+    if (o_body.Value().Find (s_newline) >= 0) {
+      i_template = i_template + 10;
+    }
+
+  ! VERSAND
+    dom.GetObject ("CUxD.CUX9100002:1.MAILTO").State ("");
+    dom.GetObject ("CUxD.CUX9100002:1.MAILCC").State ("");
+    dom.GetObject ("CUxD.CUX9100002:1.SUBJECT").State ("");
+    dom.GetObject ("CUxD.CUX9100002:1.TEXT").State ("");
+    dom.GetObject ("CUxD.CUX9100002:1.OPTION_1").State ("");
+    dom.GetObject ("CUxD.CUX9100002:1.OPTION_2").State ("");
+    dom.GetObject ("CUxD.CUX9100002:1.OPTION_3").State ("");
+    dom.GetObject ("CUxD.CUX9100002:1.OPTION_4").State ("");
+    dom.GetObject ("CUxD.CUX9100002:1.OPTION_5").State ("");
+    dom.GetObject ("CUxD.CUX9100002:1.TYPE").State (1);
+    dom.GetObject ("CUxD.CUX9100002:1.TEMPLATEID").State (i_template);
+    dom.GetObject ("CUxD.CUX9100002:1.SEND").State (1);
+
+    o_versand.State (0);
+}
+
+!  Ende des Scripts

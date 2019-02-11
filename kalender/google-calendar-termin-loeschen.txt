@@ -1,0 +1,24 @@
+! Google Löschen Ganztages-Termin
+!
+! Google Skript unter https://script.google.com
+
+! --------------------------------------------------------------
+! Debuglevel lesen; Skriptname protokollieren
+! --------------------------------------------------------------
+integer debug = 0;
+debug = dom.GetObject('SysVar-Debuglevel').State();
+
+if (debug >= 1) { dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug SKRIPTSTART Google-DeleteEvent-Today");}
+
+
+! --------------------------------------------------------------
+! Abfrage der events für heute aus dem Google Kalender
+! --------------------------------------------------------------
+
+var url="https://script.google.com/macros/s/xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx/exec";
+var cmd = "LD_LIBRARY_PATH=/usr/local/addons/cuxd /usr/local/addons/cuxd/curl -s -k -L " # url;
+
+dom.GetObject("CUxD.CUX2801001:1.CMD_SETS").State(cmd);
+dom.GetObject("CUxD.CUX2801001:1.CMD_QUERY_RET").State(1);
+var v = dom.GetObject("CUxD.CUX2801001:1.CMD_RETS").State();
+
