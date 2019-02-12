@@ -1,5 +1,5 @@
 # Skripte für die hausautomation Homematic von eQ-3
-Dieses Repository enthält meine Sammlung an Skripten für die Homematic von <a href="https://www.eq-3.de/" target="_blank">eQ-3</a>. Ich setze diese seit langem ein. Zunächst auf einer CCU2 und seit 2019 auf einer CCU3.
+Dieses Repository enthält meine Sammlung an Skripten für die Homematic von <a href="https://www.eq-3.de" target="_blank" rel="noopener">eQ-3</a>. Ich setze diese seit langem ein. Zunächst auf einer CCU2 und seit 2019 auf einer CCU3.
 
 Skripte für die Homematic selbst sind in \*.txt Dateien gespeichert. Andere Skripte sind in Dateien mit den üblichen Dateiendungen gespeichert. Screenshots verdeutlichen die Konfiguration der Homematic, wo dies notwendig ist.
 
@@ -13,7 +13,7 @@ Alle Skripte zum E-Mail, SMS- und Push-Nachrichtenversand sind im Verzeichnis <a
 Skripte zur Zeitsteuerung durch einen Google Kalender sind im Verzeichnis <a href="kalender">*kalender*</a> abgelegt. Ich nutze diese Skripte insbesondere in Verbindung mit der Steuerung der Heizung.
 
 ## Systemskripts
-Skripte rund um die Homematic sind im Verzeichnis <a href="systemskripts">*systemskripts*</a>zu finden. Ich nutze z.B. mein NAS um die Konfiguration der Homematic regelmäßig zu sichern. Ein entsprechendes Skript hierzu findet sich in diesem Verzeichnis.
+Skripte rund um die Homematic sind im Verzeichnis <a href="systemskripts">*systemskripts*</a> zu finden. Ich nutze z.B. mein NAS um die Konfiguration der Homematic regelmäßig zu sichern. Ein entsprechendes Skript hierzu findet sich in diesem Verzeichnis.
 
 ## Dank
 Über die Jahre habe ich viele Skripte rund um die Homematic aus Forenbeiträgen und von einigen Websiten entnommen. In aller Regel findet sich die ursprüngliche Quelle in den Skripten. Den Authoren der Skripte sage ich herzlichen Dank. Sie haben mir gerade in der Anfangszeit viel geholfen. In der Zwischenzeit sind beinahe alle Skripte von mir erweitert und umgebaut worden, um diese an die persönlichen Bedürfnisse anzupassen.
