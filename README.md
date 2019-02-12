@@ -1,5 +1,5 @@
 # Skripte für die hausautomation Homematic von eQ-3
-Dieses Repository enthält meine Sammlung an Skripten für die Homematic von [eQ-3](https://www.eq-3.de){:target="_blank"}. Ich setze diese seit langem ein. Zunächst auf einer CCU2 und seit 2019 auf einer CCU3.
+Dieses Repository enthält meine Sammlung an Skripten für die Homematic von [eQ-3](https://www.eq-3.de target="_blank"). Ich setze diese seit langem ein. Zunächst auf einer CCU2 und seit 2019 auf einer CCU3.
 
 Skripte für die Homematic selbst sind in \*.txt Dateien gespeichert. Andere Skripte sind in Dateien mit den üblichen Dateiendungen gespeichert. Screenshots verdeutlichen die Konfiguration der Homematic, wo dies notwendig ist.
 
