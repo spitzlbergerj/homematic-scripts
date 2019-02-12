@@ -15,6 +15,9 @@ Skripte zur Zeitsteuerung durch einen Google Kalender sind im Verzeichnis *[kale
 ## Systemskripts
 Skripte rund um die Homematic sind im Verzeichnis *[systemskripts](systemskripts)* zu finden. Ich nutze z.B. mein NAS um die Konfiguration der Homematic regelmäßig zu sichern. Ein entsprechendes Skript hierzu findet sich in diesem Verzeichnis.
 
+## SmartMirror als Anzeigemodul
+In letzter Zeit nutze ich zunehmend meinen [SmartMirror](https://magicmirror.builders/) als Anzeigegerät. Auf entsprechende Skripte/Module weise ich im Verzeichnis *[smartmirror](smartmirror)* hin.
+
 ## Dank
 Über die Jahre habe ich viele Skripte rund um die Homematic aus Forenbeiträgen und von einigen Websiten entnommen. In aller Regel findet sich die ursprüngliche Quelle in den Skripten. Den Authoren der Skripte sage ich herzlichen Dank. Sie haben mir gerade in der Anfangszeit viel geholfen. In der Zwischenzeit sind beinahe alle Skripte von mir erweitert und umgebaut worden, um diese an die persönlichen Bedürfnisse anzupassen.
 
