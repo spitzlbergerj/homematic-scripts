@@ -1,10 +1,10 @@
 # Skripte für die hausautomation Homematic von eQ-3
-Dieses Repository enthält meine Sammlung an Skripten für die Homematic von <a href="https://www.eq-3.de" target="_blank" rel="noopener">eQ-3</a>. Ich setze diese seit langem ein. Zunächst auf einer CCU2 und seit 2019 auf einer CCU3.
+Dieses Repository enthält meine Sammlung an Skripten für die Homematic von [eQ-3](https://www.eq-3.de){:target="_blank"}. Ich setze diese seit langem ein. Zunächst auf einer CCU2 und seit 2019 auf einer CCU3.
 
 Skripte für die Homematic selbst sind in \*.txt Dateien gespeichert. Andere Skripte sind in Dateien mit den üblichen Dateiendungen gespeichert. Screenshots verdeutlichen die Konfiguration der Homematic, wo dies notwendig ist.
 
 ## Heizungsskripte
-Alle Skripte rund um die Steuerung von Heizkörper- und Wand-Thermostaten sind im Verzeichnis <a href="heizung">*heizung*</a> zu finden.
+Alle Skripte rund um die Steuerung von Heizkörper- und Wand-Thermostaten sind im Verzeichnis *[heizung](heizung)* zu finden.
 
 ## Kommunikation
 Alle Skripte zum E-Mail, SMS- und Push-Nachrichtenversand sind im Verzeichnis <a href="kommunikation">*kommunikation*</a> zu finden.
