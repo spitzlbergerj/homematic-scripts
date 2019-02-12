@@ -19,7 +19,7 @@ Skripte rund um die Homematic sind im Verzeichnis *[systemskripts](systemskripts
 In letzter Zeit nutze ich zunehmend meinen [SmartMirror](https://magicmirror.builders/) als Anzeigegerät. Auf entsprechende Skripte/Module weise ich im Verzeichnis *[smartmirror](smartmirror)* hin.
 
 ## Dank
-Über die Jahre habe ich viele Skripte rund um die Homematic aus Forenbeiträgen und von einigen Websiten entnommen. In aller Regel findet sich die ursprüngliche Quelle in den Skripten. Den Authoren der Skripte sage ich herzlichen Dank. Sie haben mir gerade in der Anfangszeit viel geholfen. In der Zwischenzeit sind beinahe alle Skripte von mir erweitert und umgebaut worden, um diese an die persönlichen Bedürfnisse anzupassen.
+Über die Jahre habe ich viele Skripte rund um die Homematic aus Forenbeiträgen und von einigen Websiten entnommen. In aller Regel findet sich die ursprüngliche Quelle in den Skripten. Den Autoren der Skripte sage ich hiermit erneut herzlichen Dank. Sie haben mir gerade in der Anfangszeit viel geholfen. In der Zwischenzeit sind beinahe alle Skripte von mir erweitert und umgebaut worden, um diese an die persönlichen Bedürfnisse anzupassen.
 
 ## Nutzung meiner Skripte
 Natürlich können meine Skripte gerne für eigene Zwecke genutzt werden. Eine Gewähr, dass diese fehlerfrei und wie gedacht funktionieren, kann ich natürlcih nicht geben und schließe diese auch aus.
