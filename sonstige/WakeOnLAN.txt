@@ -33,7 +33,7 @@ string wake;
 ! Rechner im Büro starten
 ! --------------------------------------------------------------------------------------
 
-wake = "/usr/bin/ether-wake -b 1C:87:2C:60:6D:20";
+wake = "/usr/bin/ether-wake -b 11:22:33:44:55:66";
 
 
 if (wochentag <= 6)
