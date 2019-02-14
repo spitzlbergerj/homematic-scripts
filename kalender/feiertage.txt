@@ -1,0 +1,351 @@
+! Das Skript berechnet das Osterdatum und die Feiertage im aktuellen Jahr,
+! prueft ob heute und morgen ein Feiertag ist und hinterlegt das Ergebnis in den
+! Systemvariablen "Feiertag_heute" und "Feiertag_morgen"
+
+! Script von Peter Beck (01-2011)
+! Österreichergänzung von randyp (05-2012)
+! Version 2.2.1r2
+! Sachsen eingearbeitet bzw. korrigiert von Matthias Herold (11-2013)
+! Sachsen hat Buß- und Bettag: hinzugefügt, Saarland nicht: gelöscht
+
+! Es werden folgende Systemvariablen benötigt:
+! Feiertag_heute  (Typ: Boolean)
+! Feiertag_morgen (Typ: Boolean)
+
+! --------------------------------------------------------------
+! Debuglevel lesen; Skriptname protokollieren
+! --------------------------------------------------------------
+integer debug = 0;
+debug = dom.GetObject('SysVar-Debuglevel').State();
+
+if (debug >= 1) { dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug SKRIPTSTART Feiertage");}
+
+
+
+boolean Rosenmontag = 0; ! Rosenmontag ein Brauchtumstag? 1=Ja/0=Nein
+boolean Silvester   = 1;      ! Silvester stets ein freier Tag? 1=Ja/0=Nein
+boolean Heiligabend = 1;    ! Heiligabend stets ein freier Tag? 1=Ja/0=Nein
+
+string land  = "DE";      ! AT oder DE
+string bland = "BY";     ! Bundesland in DE, in den wir wohnen (in Österreich auch für bland AT eintragen)
+
+! Fuer "bland" bitte folgende Abkuerzungen benutzen:
+! BW = Baden-Württemberg
+! BY = Bayern
+! BE = Berlin
+! BB = Brandenburg
+! HB = Bremen
+! HH = Hamburg
+! HE = Hessen
+! MV = Mecklenburg-Vorpommern
+! NI = Niedersachsen
+! NW = Nordrhein-Westfalen
+! RP = Rheinland-Pfalz
+! SL = Saarland
+! SN = Sachsen
+! ST = Sachen-Anhalt
+! SH = Schleswig-Holstein
+! TH = Thüringen
+
+! AT = Österreich
+
+
+!****************************************************
+! Ab hier Script CODE - Don't change behind this line
+!****************************************************
+
+! Berechnen des Ostersonntags im aktuellen Jahr
+
+integer Jahr = system.Date("%Y").ToInteger(); ! Das aktuelle Jahr ermitteln
+integer oTag;   ! Das Tagesdatum vom Ostersonntag
+integer oMonat; ! Das Monatsdatum von Ostersonntag
+string oDatum;  ! Das komplette Datum vom Ostersonntag
+
+integer LVar1;  ! Wird für die Berechnungen benötigt
+integer LVar2;  ! Wird für die Berechnungen benötigt
+integer LVar3;  ! Wird für die Berechnungen benötigt
+integer zahl;   ! Wird für die Berechnungen benötigt
+
+! Die modifizierte Gauss-Formel nach Lichtenberg
+
+LVar1 = ((19 * (Jahr % 19)) + (15 + (((3 * (Jahr / 100)) + 3) / 4) - (((8 * (Jahr / 100)) + 13) / 25))) % 30;
+LVar2 = (LVar1 / 29) + (((LVar1 / 28) - (LVar1 / 29)) * ((Jahr % 19) / 11));
+LVar3 = 7 - (((21 + LVar1 - LVar2) - (7 - ((Jahr + (Jahr / 4) + (2 - (((3 * (Jahr / 100)) + 3) / 4))) % 7))) % 7);
+oTag  = (21 + LVar1 - LVar2) + LVar3;
+
+! Den errechneten Wert formatieren. Ausgehend vom Monat März
+
+if (oTag > 31) { ! Der Monat März hat nur 31 Tage -> Ostern im April
+
+	oMonat = 4;
+	oTag = oTag - 31;
+
+} else { oMonat = 3; } ! Ostern ist im März
+
+! Das Ergebnis in Variable oDatum hinterlegen
+
+if (oTag < 10) {
+	oDatum = "0" # oTag.ToString() # "." # "0" # oMonat.ToString() # "." # Jahr.ToString();
+} else {
+	oDatum = oTag.ToString() # "." # "0" # oMonat.ToString() # "." # Jahr.ToString();
+}
+
+! Ermitteln, wieviele Tage der Februar im aktuellen Jahr hat
+
+zahl = Jahr % 4;
+
+if (zahl == 0) { ! Ein Schaltjahr -> Feb. = 29 Tage
+	string mTage = "31,29,31,30,31,30,31,31,30,31,30,31"; ! Anzahl der Tage im Monat Jan.-Dez.
+} else {
+	string mTage = "31,28,31,30,31,30,31,31,30,31,30,31"; ! Anzahl der Tage im Monat Jan.-Dez.
+}
+
+string sDatum = system.Date("%d.%m."); ! Das heutige Datum
+integer Durchlauf = 0;
+
+while (Durchlauf < 2)
+{
+	boolean Feiertag = 0; ! 0/1 = kein/Feiertag
+
+	!***************************************************************************
+	! Feste Feiertage bundesweit, fuer DE und AT
+	!***************************************************************************
+
+	if (sDatum == "01.01.") { Feiertag = 1; } ! Neujahr
+	if (sDatum == "01.05.") { Feiertag = 1; } ! Maifeiertag - Tag der Arbeit
+	if (sDatum == "25.12.") { Feiertag = 1; } ! 1. Weihnachtstag
+	if (sDatum == "26.12.") { Feiertag = 1; } ! 2. Weihnachtstag
+
+	!***************************************************************************
+	! Feste Feiertage bundesweit in DE
+	!***************************************************************************
+	if (land == "DE") {
+		if (sDatum == "03.10.") { Feiertag = 1; } ! Tag der Deutschen Einheit
+	}
+
+	!***************************************************************************
+	! Feste Feiertage bundesweit in AT
+	!***************************************************************************
+	if (land == "AT") {
+		if (sDatum == "26.10.") { Feiertag = 1; } ! Österreichischer Nationalfeiertag
+		if (sDatum == "08.12.") { Feiertag = 1; } ! Maria Empfaengnis
+	}
+
+	!***************************************************************************
+	! Eigene, feste Feiertage?
+	!***************************************************************************
+
+	if ((Heiligabend) && (sDatum == "24.12.")) { Feiertag = 1; } ! Weihnachten
+	if ((Silvester) && (sDatum == "31.12."))   { Feiertag = 1; } ! Silvester
+
+	!***************************************************************************
+	! Fester Feiertag in BW, BY, ST, AT
+	!***************************************************************************
+
+	if ((bland == "BW") || (bland == "BY") || (bland == "ST") || (land == "AT")) {
+		if (sDatum == "06.01.") { Feiertag = 1; } ! Erscheinungsfest - Hl. 3 Koenige
+	}
+
+	!***************************************************************************
+	! Fester Feiertag in BB, MV, SA, ST, TH, SN
+	!***************************************************************************
+
+	if ((bland == "BB") || (bland == "MV") || (bland == "SA") || (bland == "ST") || (bland == "TH") || (bland == "SN")) {
+		if (sDatum == "31.10.") { Feiertag = 1; } ! Reformationstag
+	}
+
+	!***************************************************************************
+	! Fester Feiertag in BW, BY, NW, RP, SL, AT
+	!***************************************************************************
+
+	if ((bland == "BW") || (bland == "BY") || (bland == "NW") || (bland == "RP") || (bland == "SL") || (land == "AT")) {
+		if (sDatum == "01.11.") { Feiertag = 1; } ! Allerheiligen
+	}
+
+	!***************************************************************************
+	! Fester Feiertag in BY (nicht überall), SL, AT
+	!***************************************************************************
+
+	if ((bland == "BY") || (bland == "SL") || (land == "AT")) {
+	   if (sDatum == "15.08.") { Feiertag = 1; } ! Maria Himmelfahrt
+	}
+
+	!***************************************************************************
+	!** Bewegliche Feiertage bundesweit **
+	!***************************************************************************
+
+	string feiertage = "";
+
+	if (land == "DE") {
+		feiertage = "0,1,-2,39,50"; ! Array mit Differenztage zum Ostersonntag
+									! Ostersonntag, Ostermontag, Karfreitag, Christi Himmelfahrt, Pfingstmontag
+	}
+
+	if (land == "AT") {
+		feiertage = "0,1,39,50";    ! Array mit Differenztage zum Ostersonntag
+									! Ostersonntag, Ostermontag, Christi Himmelfahrt, Pfingstmontag
+	}
+
+	!***************************************************************************
+	! Bewegliche Feiertage BW, BY, HE, NW, RP, SL, (SA, TH nicht überall), AT
+	!***************************************************************************
+
+	if ((bland == "BW") || (bland == "BY") || (bland == "HE") || (bland == "NW") || (bland == "RP") || (bland == "SL") || (bland == "SA") || (bland == "TH") || (land == "AT")) {
+		feiertage = feiertage # ",60"; ! Fronleichnam
+	}
+
+	!***************************************************************************
+	!***   Hier evtl. weitere Feier-/Brauchtumstage ***
+	!***************************************************************************
+
+	if (Rosenmontag) {
+		feiertage = feiertage # ",-48"; ! Rosenmontag stets 48 Tage vor dem Ostersonntag
+	}
+
+	!***************************************************************************
+	! Ab hier werden die Feiertage berechnet
+	!***************************************************************************
+
+	! Anzahl der Tage im Ostermonat
+	zahl = (3 * oMonat) - 3;
+	integer oTage = mTage.Substr(zahl, 2).ToInteger(); ! Anzahl der Tage im Ostermonat
+
+	string fDatum;    ! Das Feiertagsdatum
+	integer fDiff;    ! Anzahl der Tage von Ostersonntag entfernt
+	boolean Schleife; ! Für die Berechnungen in der while-Schleife notwendig
+
+	string index;
+	foreach(index, feiertage.Split(",")) {
+
+		fDiff = index.ToInteger();
+		Schleife = 1;
+
+		zahl = oTag + fDiff; ! Differenztage zum Referenztag hinzurechnen
+
+		if (fDiff > 0) {
+			if (zahl > oTage) {
+				zahl = zahl - oTage; ! Sind wir ausserhalb des Referenzmonats?
+			} else { ! Nein => Berechnungschleife nicht durchlaufen.
+			   Schleife = 0;
+			   LVar2 = oMonat;
+			}
+		} else {
+			if (zahl > 0) { ! Wenn innerhalb des Referenzmonats => Berechnungsschleife nicht durchlaufen.
+				Schleife = 0;
+				LVar2 = oMonat;
+			}
+		}
+
+		LVar1 = 0;
+
+		if (fDiff > 0) {
+			while (Schleife) {
+				LVar1 = LVar1 + 1.00;
+				LVar2 = oMonat + LVar1;
+				LVar3 = (3 * LVar2) - 3;
+				zahl = zahl - mTage.Substr(LVar3, 2).ToInteger();
+				if (zahl <= 0) { ! Aktueller Monat gefunden
+					Schleife = 0;
+					zahl = zahl + mTage.Substr(LVar3, 2).ToInteger(); ! Wieder addieren, um den Tag zu berechnen
+				}
+			}
+		} else {
+			if (fDiff < 0) {
+				while (Schleife) {
+					LVar1 = LVar1 + 1.00;
+					LVar2 = oMonat - LVar1;
+					LVar3 = (3 * LVar2) - 3;
+					zahl = zahl + mTage.Substr(LVar3, 2).ToInteger();
+					if (zahl > 0) { ! Aktueller Monat gefunden
+						Schleife = 0;
+					}
+				}
+			}
+		}
+
+		if (zahl < 10) {
+			fDatum = "0" # zahl.ToString() # ".";
+		} else {
+			fDatum = zahl.ToString() # ".";
+		}
+
+		if (LVar2 < 10) {
+			fDatum = fDatum # "0" # LVar2.ToString() # ".";
+		} else {
+			fDatum = fDatum # LVar2.ToString() # ".";
+		}
+
+		if (sDatum == fDatum) { Feiertag = 1; }
+	}
+
+	!****************************
+	! Beweglicher Feiertag im SN
+	!****************************
+
+	if (bland == "SN") {
+
+		! Buß- und Bettag (Mittwoch vor dem Sonntag vor dem 1. Advent)
+
+		fDiff = 32; ! 32 Tage vor dem 4. Advent
+
+		! Um den 4. Advent zu ermitteln, muss zunächst der Wochentag des 24. Dez. ermittelt werden
+
+		! Wochentagberechnung wie folgt:
+
+		! TZ  = Tag mod 7                             => Tag = 24 fuer den 24.12.
+		! MZ = 5                                      => 0,3,3,6,1,4,6,2,5,0,3,5 (Fuer jeden Monat Jan. bis Dez. eine Ziffer)
+		! JZ = (Zahl + (Zahl / 4)) mod 7              => Zahl = 10, die letzten beiden Ziffern der Jahreszahl 2010
+		! JHZ = (3 - (Zahl mod 4)) * 2                => Zahl = 20, die ersten beiden Ziffern der Jahreszahl 2010
+		! SJK = Zahl                                  => Schaltjahreskorrektur: Zahl = 0 wenn kein Schaltjahr, sonst Zahl = 6
+		! Ergebnis = (TZ + MZ + JZ + JHZ + SJK) mod 7 => 0 = So, 1 = Mo, 2 = Di, 3 = Mi, 4 = Do, 5 = Fr, 6 = Sa
+
+		! Mit dieser Rechnung kann man zu jedem Datum den Wochentag berechnen.
+
+		LVar1 = oDatum.Substr(8, 2).ToInteger();
+		zahl  = (LVar1 + (LVar1 / 4)) % 7;
+		LVar1 = oDatum.Substr(6, 2).ToInteger();
+		LVar2 = ((3 - (LVar1 % 4)) * 2) + zahl;
+		LVar1 = oDatum.Substr(6, 4).ToInteger() % 4;
+
+		if (LVar1 == 0) { zahl = 6; } else { zahl = 0; }
+
+		LVar1 = ((24 % 7) + 5 + LVar2 + zahl) % 7; ! Ergebnis (LVar1) ist die Wochentagszahl
+
+		! Feiertag ermitteln: 30 Novembertage - (fDiff + Wochentagszahl - 24)
+		! Der Monat ist stets der November
+
+		zahl = 30 - (fDiff + LVar1 - 24);
+
+		fDatum = zahl.ToString() # ".11.";
+
+		if (sDatum == fDatum) { Feiertag = 1; }
+	}
+
+	if (Durchlauf == 0) {
+		dom.GetObject('SysVar-Feiertag-heute').State(Feiertag);
+		Durchlauf = 1;
+
+		! Datum von morgen für den 2. Durchlauf ermitteln
+
+		LVar1 = system.Date("%d").ToInteger() + 1.00; ! Einen Tag weiter --> morgen
+		index = system.Date("%m");
+		LVar2 = index.ToInteger();
+
+		zahl = (3 * LVar2) - 3;
+		LVar3 = mTage.Substr(zahl, 2).ToInteger(); ! Anzahl der Tage im aktuellen Monat
+		if (LVar1 > LVar3) { ! Wenn Monatsgrenze überschritten wurde
+			sDatum = "01.";
+			if (LVar2 == 12) {
+				sDatum = sDatum # "01.";
+			} else {
+				LVar2 = LVar2 + 1.00;
+				if (LVar2 < 10) { sDatum = sDatum # "0" # LVar2.ToString() # "."; } else { sDatum = sDatum # LVar2.ToString() # "."; }
+			}
+		} else {
+			if (LVar1 < 10) { sDatum = "0" # LVar1.ToString() # "." # index # ".";} else { sDatum = LVar1.ToString() # "." # index # "."; }
+		}
+	} else {
+		dom.GetObject('SysVar-Feiertag-morgen').State(Feiertag);
+		Durchlauf = 2;
+	}
+}

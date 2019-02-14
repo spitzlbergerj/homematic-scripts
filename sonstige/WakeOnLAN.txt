@@ -1,0 +1,62 @@
+! ----------------------------------------------------------------------
+! Wake-on-LAN
+! Version 1.0
+! Josef Spitzlberger
+!
+! Skript wird gestartet um:
+!	06:xx Uhr
+!	16:xx Uhr
+! ----------------------------------------------------------------------
+
+! --------------------------------------------------------------
+! Debuglevel lesen; Skriptname protokollieren
+! --------------------------------------------------------------
+integer debug = 0;
+debug = dom.GetObject('SysVar-Debuglevel').State();
+
+if (debug >= 1) { dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("logger -t script -p user.debug 'SKRIPTSTART Wake-on-LAN'");}
+
+
+! ----------------------------------------------------------------------
+! weitere Variable
+! ----------------------------------------------------------------------
+boolean tagsueber_da = dom.GetObject('SysVar-Tagsueber-da-heute').State();
+
+var aktStunde = system.Date("%H");
+aktStunde = aktStunde.ToInteger();
+
+integer wochentag = system.Date("%u");
+
+string wake;
+
+! --------------------------------------------------------------------------------------
+! Rechner im Büro starten
+! --------------------------------------------------------------------------------------
+
+wake = "/usr/bin/ether-wake -b 1C:87:2C:60:6D:20";
+
+
+if (wochentag <= 6)
+{
+	if (tagsueber_da) 
+	{
+		if (aktStunde == 6)
+		{
+			dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State(wake);
+		}
+	}
+	else
+	{
+		if (aktStunde == 16)
+		{
+			dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State(wake);
+		}
+	}
+}
+else
+{
+	if (aktStunde == 6)
+	{
+		dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State(wake);
+	}
+}

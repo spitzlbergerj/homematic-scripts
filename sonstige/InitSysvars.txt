@@ -1,0 +1,11 @@
+! ----------------------------------------------------------------------
+! Setzen von Variablen beim Neustart der CCU
+! sjj, 20.01.2019
+! ----------------------------------------------------------------------
+
+! Setzen der Keys fuer Push Meldungen
+var PKSepp = "ESY:GCM-5C46A864-3EF2-4161-923F-4660838159D7";
+var PKPaula = "ESY:GCM-C6BC83CB-C797-4600-BDCB-59970AF9E02A";
+
+dom.GetObject("EASYPushKey-Sepp").State(PKSepp);
+dom.GetObject("EASYPushKey-Paula").State(PKPaula);

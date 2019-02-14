@@ -1,0 +1,29 @@
+var APIKey =  dom.GetObject("EASYPushKey-Sepp").State();
+
+! Hier das Event der Push Nachricht angeben
+string event = "Push Test Nachricht!";
+
+! Hier den Inhalt der Push Nachricht angeben
+string PushText;
+PushText = "Dies ist eine Testnachricht von der Homematic!";
+
+! Alles ab hier bitte UNVERÄNDERT übernehmen
+
+string stdout;
+string stderr;
+string teilstr;
+string sendtext = "";
+string sendevent = "";
+string sendapikey = "";
+
+foreach(teilstr, APIKey.Split(" ")) {
+  sendapikey = sendapikey # "+" # teilstr;
+}
+foreach(teilstr, event.Split(" ")) {
+  sendevent = sendevent # "+" # teilstr;
+}
+foreach(teilstr, PushText.Split(" ")) {
+  sendtext = sendtext # "+" # teilstr;
+}
+
+dom.GetObject("CUxD.CUX2801001:1.CMD_EXEC").State("/bin/sh /etc/config/addons/mh/prowl.sh "# sendapikey # " " # sendevent # " " # sendtext);

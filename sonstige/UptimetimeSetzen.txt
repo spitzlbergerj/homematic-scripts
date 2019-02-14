@@ -1,0 +1,11 @@
+! HomeMatic-Script
+! UPTIME DER CCU
+! http://www.christian-luetgens.de/homematic/cuxd/uptime/Uptime.htm
+
+string s_cuxd = "CUxD.CUX2801001:3.";
+string s_cmd = "cat /proc/uptime | awk '// { printf \"%dT %02d:%02d\", $1/86400, $1/3600%24, $1/60%60 }'";
+dom.GetObject (s_cuxd # "CMD_SETS").State (s_cmd);
+dom.GetObject (s_cuxd # "CMD_QUERY_RET").State (1);
+dom.GetObject ("Uptime").State (dom.GetObject (s_cuxd # "CMD_RETS").State());
+
+!  Ende des Scripts

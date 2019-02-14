@@ -1,0 +1,125 @@
+! HomeMatic-Script
+! SERVICEMELDUNGEN PER E-MAIL SENDEN
+! http://www.christian-luetgens.de/homematic/e-mail/servicemeldungen/Servicemeldungen.htm
+
+! PSEUDO-ARRAY FÜR GENERISCHE UND KANALSPEZIFISCHE FEHLER
+! Feldtenner der Reihe nach: Tab ? ; = :
+
+  string s_servicemeldungen =                
+    "ERROR?" #
+      "CLIMATECONTROL_VENT_DRIVE="                            # ".:Ventil blockiert:Ventil falsch montiert:Stellbereich zu klein:Batterie leer, Störposition angefahren;" #
+      "MOTION_DETECTOR:ROTARY_HANDLE_SENSOR:SHUTTER_CONTACT=" # ".:.:.:.:.:.:.:Sabotage erkannt;" #
+      "DIMMER:VIRTUAL_DIMMER="                                # ".:.:.:Lastfehler;" #
+      "WINMATIC="                                             # ".:Fehler Drehgriff:Fehler Kippantrieb;" #
+      "KEYMATIC="                                             # ".:Fehler einkuppeln:Abbruch Motorlauf\t" #
+    "ERROR_OVERHEAT?" #
+      ".="                                                    # ".:Überhitzung\t" #
+    "ERROR_OVERLOAD?" #
+      ".="                                                    # ".:Überlast\t" #
+    "ERROR_REDUCED?" #
+      ".="                                                    # ".:Last zu gering\t" #
+    "ERROR_POWER?" #
+      ".="                                                    # ".:Stromversorgung ausgefallen\t" #
+    "ERROR_SABOTAGE?" #
+      ".="                                                    # ".:Sabotage erkannt\t" #
+    "ERROR_BATTERY?" #
+      ".="                                                    # ".:Batterie defekt\t" #  
+    "STATE?" #
+      "WATERDETECTIONSENSOR="                                 # ".:Feuchtigkeit erkannt:Nässe erkannt;" #
+      "SMOKE_DETECTOR_TEAM="                                  # ".:Alarm ausgelöst;" #
+      "SENSOR_FOR_CARBON_DIOXIDE="                            # ".:CO2-Belastung erhöht:CO2-Belastung stark erhöht\t" #
+    "U_SOURCE_FAIL?" #
+      ".="                                                    # "Netzteil ausgefallen\t" #
+    "USBH_POWERFAIL?" #
+      ".="                                                    # "USB-Host deaktiviert\t" #
+    "FAULT_REPORTING?" #
+      ".="                                                    # ".:Ventil blockiert:Ventil falsch montiert:Stellbereich zu klein:Kommunikationsfehler:.:Batteriestand niedrig:" #
+                                                                "Batterie leer, Störposition angefahren\t" #
+    "LOWBAT?" #
+      ".="                                                    # "Batteriestand niedrig\t" #
+    "STICKY_UNREACH?" #
+      ".="                                                    # "Kommunikation war gestört\t" #
+    "UNREACH?" #
+      ".="                                                    # "Kommunikation ist zur Zeit gestört\t" #
+    "DEVICE_IN_BOOTLOADER?" #
+      ".="                                                    # "Gerät startet neu\t" #
+    "UPDATE_PENDING?" #
+      ".="                                                    # "Update verfügbar\t" #
+    "CONFIG_PENDING?" #
+      ".="                                                    # "Konfigurationsdaten stehen zur Übertragung an";
+
+      
+! VARIABLEN ... 
+! ... DURCH LISTEN ITERIEREN
+    
+  object o_channel;
+  object o_dp;
+  object o_al_item;
+  string s_al_item;
+  string s_error_type;
+  integer i_error_param;
+  string s_list_1;
+  string s_list_2;
+  string s_list_3;
+  boolean b_found;
+
+! ... MAIL AUFBAUEN
+  
+  string s_lastdevice;
+  string s_device;
+  string s_title;
+  string s_body;
+  string s_subj = "Offene Servicemeldungen";
+  integer i_msgcount = dom.GetObject(41).Value();
+  
+! HAUPTPROGRAMM
+
+if (i_msgcount == 0) {
+  s_body = "Keine Servicemeldungen";
+} else {
+  s_body = i_msgcount # " Servicemeldung(en)";
+}
+
+foreach (s_al_item, dom.GetObject(ID_SERVICES).EnumUsedNames()) {
+  o_al_item = dom.GetObject (s_al_item);
+  if (o_al_item.AlState() == asOncoming) {
+    
+    s_error_type = s_al_item.StrValueByIndex (".", 1).StrValueByIndex ("-", 0);
+    i_error_param = s_al_item.StrValueByIndex (".", 1).StrValueByIndex ("-", 1).ToInteger();
+    o_dp = dom.GetObject(o_al_item.AlTriggerDP());
+    o_channel = dom.GetObject (o_dp.Channel());
+    s_device = o_channel.Name().StrValueByIndex (":", 0);
+    if (s_device != s_lastdevice) {
+      s_lastdevice = s_device;
+      s_title = "\n\n" # s_device;
+    }
+    b_found = false;
+    foreach (s_list_1, s_servicemeldungen) {
+      s_list_2 = s_list_1.StrValueByIndex ("?", 0);
+      if (s_list_2 == s_error_type) {
+        foreach (s_list_2, s_list_1.StrValueByIndex("?", 1).Split(";")) {
+          s_list_3 = ":" # s_list_2.StrValueByIndex("=", 0) # ":";
+          if ((s_list_3 == ":.:") || (s_list_3.Find (":" # o_channel.HssType() # ":") != -1)) {
+            s_list_3 = s_list_2.StrValueByIndex("=", 1).StrValueByIndex(":", i_error_param);
+            b_found = (s_list_3 != "");
+            if (b_found) {
+              s_body = s_body # s_title # "\n  " # s_list_3;
+              s_title = '';
+            }
+          }
+        }
+      }
+    }
+    if (!b_found) {
+      s_body = s_body # s_title # "\n  " # "MESSAGE NOT DEFINED: " # s_error_type # "/" # o_channel.HssType() # "/" # i_error_param;
+      s_title = '';
+    }
+  }
+}
+
+
+dom.GetObject ("E-Mail.Subject").State (s_subj);
+dom.GetObject ("E-Mail.Body").State (s_body);
+dom.GetObject ("E-Mail.Versand").State (2);
+
+!  Ende des Scripts
