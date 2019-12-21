@@ -1,0 +1,173 @@
+
+function doGet(request) {
+  var answer = "sjj.3.2";
+  answer = getEventsToday(); 
+  return ContentService.createTextOutput(answer);
+}
+
+// corrects a google bug in all day events
+function daysEvents( aDate )
+{
+  var now = new Date( aDate );
+  now.setHours(12);
+  now.setMinutes(0);
+  now.setSeconds(0);
+
+  var startOfDay = new Date(now);
+  startOfDay.setUTCHours(0);
+  startOfDay.setMinutes(0);
+  startOfDay.setSeconds(0);
+  // Fehler in der Google-Behandung der AllDay Events
+  startOfDay.setMilliseconds(0); 
+  // startOfDay.setMilliseconds(100);
+  // var endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
+  var endOfDay = new Date(startOfDay.getTime() + 23 * 59 * 59 * 900);
+  
+  var events = CalendarApp.getDefaultCalendar().getEvents(startOfDay, endOfDay);
+  var result = new Array;
+  
+  for (var i=0; i<events.length; i++)
+  {
+    var theTitle=events[i].getTitle();
+    if ( events[i].isAllDayEvent() )
+    {
+      result.push(events[i]);
+    }
+  }
+  
+  events = CalendarApp.getEventsForDay( now );
+  for (var i=0; i<events.length; i++)
+  {
+    var theTitle=events[i].getTitle();
+    if ( !events[i].isAllDayEvent() )
+    {
+      result.push(events[i]);
+    }
+  }
+    
+  return result;
+}
+
+// corrects a google bug in all day events
+function todaysEvents()
+{
+  var now = new Date();
+
+  var events = daysEvents( now );
+  return events;
+}
+
+function tomorrowsEvents()
+{
+  var now = new Date();
+  var tomorrow = new Date(now.getTime()+(1000*60*60*24));
+
+  var events = daysEvents( tomorrow );
+  return events;
+}
+
+function getVacation()
+{
+  var events = todaysEvents();
+  
+  var result = "0";
+  
+  //add here your search definitions for vacation description and location 'home'
+  var pattVacation=new RegExp('urlaub|vacation|frei','i');
+  // var pattHome=new RegExp('hause|home','i');
+
+  
+  for (var i=0; i<events.length; i++)
+  {
+    var theTitle=events[i].getTitle();
+    if ( pattVacation.test(events[i].getTitle()) && events[i].isAllDayEvent() )
+    {
+      result="1";
+      break;
+    }
+  }
+  
+  return (result);
+}
+
+// added from http://homematic-forum.de/forum/viewtopic.php?f=31&t=11386#p84827
+
+function getVacationEx()
+//creates a bit mask including todays and tomorrows vacation information
+{
+  //init bit mask and flags
+  var result = 0x0; //0000 - initial value
+  var vacationToday = 0x1; // 0001 - today is an vacation day
+  var atHomeToday = 0x2; // 0010 - vacation today is at home
+  var vacationTomorrow = 0x4; // 0100 - tomorrow is an vacation day
+  var atHomeTomorrow = 0x8; // 1000 - vacation tomorrow is at home
+  
+  //add here your search definitions for vacation description and location 'home'
+  var pattVacation=new RegExp('urlaub|vacation|frei|homeoffice','i');
+  var pattHome=new RegExp('hause|home','i');
+  
+  //get information about today's vacation
+  var eventsToday = todaysEvents();
+  for (var i=0; i<eventsToday.length; i++)
+  {
+    //check event title
+    if (pattVacation.test(eventsToday[i].getTitle()))
+    {
+      result = result | vacationToday;
+      //
+      if (pattHome.test(eventsToday[i].getTitle()) || pattHome.test(eventsToday[i].getLocation())|| pattHome.test(eventsToday[i].getDescription()))
+      {
+        result = result | atHomeToday;
+      }
+    }
+  }
+  
+  //get information about tomorrow's vacation
+  var eventsTomorrow = tomorrowsEvents();
+  for (var i=0; i<eventsTomorrow.length; i++)
+  {
+    if (pattVacation.test(eventsTomorrow[i].getTitle()))
+    {
+      result = result | vacationTomorrow;
+      if (pattHome.test(eventsTomorrow[i].getTitle()) || pattHome.test(eventsTomorrow[i].getLocation())|| pattHome.test(eventsTomorrow[i].getDescription()))
+      {
+        result = result | atHomeTomorrow;
+      }
+    }
+  }
+  return (result.toString());
+}
+
+function getEventsToday()
+{
+  var events = todaysEvents();
+  
+  var result = "GE";
+   
+  for (var i=0; i<events.length; i++)
+  {
+    if ( result.length > 0)  {
+      result = result+";";
+    }
+    result = result + events[i].getTitle().toLowerCase();
+  }
+  
+  return (result);
+}
+
+function getEventsTomorrow()
+{
+  var eventsTomorrow = tomorrowsEvents();
+  
+  var result = "GE";
+   
+  for (var i=0; i<eventsTomorrow.length; i++)
+  {
+    if ( result.length > 0)  {
+      result = result+";";
+    }
+    result = result + eventsTomorrow[i].getTitle().toLowerCase();
+  }
+  
+  return (result);
+}
